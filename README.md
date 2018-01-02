@@ -1,5 +1,7 @@
 **Vehicle Detection Project**
 
+Jay Urbain
+
 The goals / steps of this project are the following:
 
 * Perform a Histogram of Oriented Gradients (HOG) feature extraction on a labeled training set of images and train a classifier Linear SVM classifier
@@ -19,13 +21,61 @@ Credits: The code relies heavily on the lesson examples from the Udacity Self-Dr
 
 ---
 
-### Histogram of Oriented Gradients (HOG)
+### Summary of changes from prior version:
 
-#### 1. Explain how (and identify where in your code) you extracted HOG features from the training images.
+Rewrote a significant part of my initial submission. The initial submission overfit the training data and generated some false positives. I have incorporated all of the reviewer's suggestions and more. The results are improved by there are still a few false positives.
+
+Features:  
+- HLS color space, 9 orientations, 8 pixels per cell, and 2 cells per block. Identified the parameters with a feature abblation study.  
+- 16x16 color spatial domain, 32 color histogram bins.  
+
+Classification:  
+- Linear SVM with C=0.0001. Identified with grid search. Performance in terms of accuracy on the validation and tests sets were very close with vaues of C ranging from 0.0001 to 1.0. 
+
+Window queue:  
+- Histogram threshold=15 of video image heatmaps. 
+
+Updates:   
+- Due to the temporal (image sequence) nature of the dataset choosing images randomly for constructing training, validation, and test sets can inadverdantly leak images in the validation and test sets into the training sets. Therefore the training (70%), validation (20%), and test (10%) sets were constructued from images sequences. Each set was then randomized.
+- Added spatial binning and color histogram features. Did not really see a signficant improvement in performance with these features.  
+- Added scaling of feature vectors due to the addition of color histograms and spatical binning.    
+- Using an abblation study, switched from YUV to HLS colorspaces.  Higher accuracy on new dataset.  The original parameters of YUV, 9 orientations, 8 pixels per cell, and 2 cells per block underformed HLS, 9 orientations, 8 pixels per cell, and 2 cells for over 2% on validation data with the new dataset. 
+- Using a HOG filter with 9 or 12 orientations worked about the same. pixels_per_cell of 8 or 16 worked about the same. Other optimization techniques that proved helpful included the heatmap and heatmap threshold.
+- Used GridSearchCV() to identify C=0.0001 for a smoother, more generalizable decision boundary.   
+- Added bounding box class to implement a queue for generating heat map. Requireds 15 for video.  
+- Increased the window overlap for sliding windows search from 50% to 75% to eliminate false negatives.  
+
+---
+### Data Exploration
 
 Under the sections **Load Data** and **Visualize Data**, the first step was to load and explore the dataset for both *car* and *not car* classes. Sample images are shown below.
 
+Labeled images were taken from the project defined GTI vehicle image database [GTI](http://www.gti.ssr.upm.es/data/Vehicle_database.html), the [KITTI](http://www.cvlibs.net/datasets/kitti/) and the vision benchmark suite, and the project video.
+
+All images are 64x64 pixels. 
+
+In total there are 8792 images of vehicles and 9666 images of non vehicles. So the dataset is relatively balanced.
+
+Below are sample images of *car* and *not car* images: 
+
 <img src="images/data_set_samples.png" alt="Calibration images" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
+
+Due to the temporal (image sequence) nature of the dataset choosing images randomly for constructing training, validation, and test sets can inadverdantly leak images in the validation and test sets into the training sets. Therefore the training (70%), validation (20%), and test (10%) sets were constructued from images sequences. Then each set was randomized as follows:  
+
+[ 583  293  636  464 4176 6277] [ 750  377  818  597 5369 8071]  
+Number of samples in cars training set:  6152  
+Number of samples in notcars training set:  6277  
+Number of samples in cars validation set:  1759  
+Number of samples in notcars validation set:  1794  
+Number of samples in cars test set:  881  
+Number of samples in notcars test set:  897  
+car_image.shape (64, 64, 3)  
+
+This technique required to data to be "re-joined" for proper scaling, and then "re-separated.""
+
+### Histogram of Oriented Gradients (HOG)
+
+#### 1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
 HOG visualization is a representation that shows the dominant gradient direction within each cell with brightness corresponding to the strength of gradients in that cell.
 
@@ -41,116 +91,82 @@ Here is an example using a grayscale image and HOG parameters of `orientations=8
 
 <img src="images/sample_hog.png" alt="sample_hog.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
 
-The function **extract_features()** takes an image with specifications for orientations, pixels_per_cell, and cells_per_block, as well as flags set for whether or not you want the feature vector unrolled and/or a visualization image. The pixels per cell are normalized over the cells per block.
+### Optionally, you can also apply a color transform and append binned color features, as well as histograms of color, to your HOG feature vector. 
+
+- Added color histogram and binned features.     
+
+- Added scaling of feature vectors due to the addition of color histograms and binned features.   
+
+The images below show the car and its spaitally binned color features for an **RGB** colorspace:   
+
+<img src="images/spacialy_binned_features_car.png" alt="spacialy_binned_features_car.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
+
+<img src="images/spacialy_binned_features.png" alt="spacialy_binned_features.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
+
+The functions **single_img_features()** takes an image with specifications for: 
+img,  
+color_space, # (RGB, HSV, etc.),  
+spatial_size #for spatial binning,  
+hist_bins #for color histogram, 
+orient, pix_per_cell, cell_per_block, hog_channel, # for HOG
+spatial_feat=True, hist_feat=True, hog_feat=True) # booleans for features
+
+The function **get_features()** process multipleimages by calling **single_img_features()**.
+
+These functions replace **extract_features()**.
 
 An abblation study of HOG parameters and color spaces using a Linear SVM classifier was used to determine optimal parameters for color spaces and hog parameters. See section 3 below.
 
 #### 2. Explain how you settled on your final choice of HOG parameters.
 
-An abblation study of HOG parameters and color spaces using a Linear SVM classifier was used to determine optimal parameters for color spaces and hog parameters. See section 3 below.
+Under the section **Perform feature ablation study**, an abblation study of HOG parameters and color spaces using a Linear SVM classifier was used to determine optimal parameters for color spaces and hog parameters. See section 3 below.
+
+The original selection of YUV was switched to HLS.
 
 #### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
-Under the section **Create and evaluate an SVM classifier with default HOG parameters and an RGB color space**, a Linear SVM classifier function using sklearn.svm.LinearSVC) can be found in *trainSVM(X_train, y_train, n_predict=10)*
+Under the section **Create and evaluate an SVM classifier using HOG, color histogram and color spatial parameters** an SVM classifier was created.  
 
-Initially the classifier was trained with the following parameters:  
-colorspace = 'RGB' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb  
-orient = 9  
-pix_per_cell = 8  
-cell_per_block = 2  
-hog_channel = 0 # Can be 0, 1, 2, or "ALL"
+Shown below is the output of the final parameters. LinearSVC() was parameterized with **svc = LinearSVC(C=0.0001)** after running sklearn **GridSearchCV()**. A RBF kernel was also selected, this kernel would not converge unless I reduced the dimensionality of the model.
 
-Output:  
-
-`
-52.52 Seconds to extract HOG features...
-Using: 9 orientations 8 pixels per cell and 2 cells per block
-Feature vector length: 1764
-`
-
-Optimal HOG and color space parameters were determined using an abblation study consisting of all permutations of the following parameters when trained on a Linear SVM classifier:  
-
-
-colorspaces = ['RGB', 'HSV', 'HLS', 'YUV', 'YCrCb']  
-hog_channels = [0, 1, 2,'ALL']  
-orientations = [6, 9, 12]  
-pixels_per_cell = [4, 8, 16]  
-cell_per_block = [2, 4, 8]  
-
-Sample output of top performing models:  
-
-***  
-Colorspace HSV HOG Channel ALL  
-118.69 Seconds to extract HOG features...  
-Using: 12 orientations 8 pixels per cell and 2 cells per block  
-Feature vector length: 7056  
-5.34 Seconds to train SVC...  
-Test Accuracy of SVC =  0.9845  
-My SVC predicts:  [ 0.  1.  0.  0.  1.  1.  0.  1.  1.  0.]  
-For these 10 labels:  [ 0.  1.  0.  0.  1.  1.  0.  1.  1.  0.]  
-0.00174 Seconds to predict 10 labels with SVC  
-
-HSV and YUV colorspaces using 'ALL' channels worked about the same.  
-
-Using 9 or 12 orientations worked about the same.    
-
-***  
-Colorspace YUV HOG Channel ALL  
-117.14 Seconds to extract HOG features...  
 Using: 9 orientations 8 pixels per cell and 2 cells per block  
-Feature vector length: 5292  
-6.62 Seconds to train SVC...  
-Test Accuracy of SVC =  0.9834  
-My SVC predicts:  [ 0.  1.  0.  0.  1.  0.  0.  1.  0.  0.]  
-For these 10 labels:  [ 0.  1.  0.  0.  1.  0.  0.  1.  0.  0.]  
-0.00181 Seconds to predict 10 labels with SVC  
-
-***  
-Colorspace YUV HOG Channel ALL  
-123.2 Seconds to extract HOG features...  
-Using: 12 orientations 8 pixels per cell and 2 cells per block  
-Feature vector length: 7056  
-6.61 Seconds to train SVC...  
-Test Accuracy of SVC =  0.9862  
-My SVC predicts:  [ 0.  0.  0.  1.  1.  1.  1.  0.  0.  0.]  
-For these 10 labels:  [ 0.  0.  0.  1.  1.  1.  1.  0.  0.  0.]  
-0.00163 Seconds to predict 10 labels with SVC  
-
-From the top performing models, the following model was selected.  *YUV* was selected over *HSV* due to its better performance on the "Advanced lane find project." 
-
-colorspace = 'YUV'  
-orient = 9  
-pix_per_cell = 8  
-cell_per_block = 2  
-hog_channel = 'ALL'  
+Feature vector length: 6156  
+2.52 Seconds to train SVC...  
+Validation Accuracy of SVC =  0.9783  
+Test Accuracy of SVC =  0.9533  
+My SVC predicts:  [ 1.  0.  0.  1.  0.  1.  1.  0.  0.  0.  1.  1.  1.  1.  1.  0.  0.  0.  
+  0.  1.  0.  1.  0.  1.  0.  1.  1.  1.  0.  0.  0.  1.  0.  1.  0.  1.  
+  1.  1.  1.  0.  0.  0.  0.  1.  1.  1.  1.  1.  0.  1.  1.  0.  1.  0.  
+  0.  0.  1.  1.  1.  0.  0.  1.  1.  0.  1.  1.  1.  1.  0.  1.  1.  0.  
+  0.  1.  0.  1.  0.  1.  1.  1.  0.  1.  0.  1.  0.  1.  1.  1.  0.  0.  
+  0.  1.  0.  1.  1.  0.  1.  1.  0.  0.]  
+For these 100 labels:  [ 1.  0.  0.  1.  0.  1.  0.  0.  0.  0.  1.  1.  1.  1.  0.  0.  0.    0.
+  0.  1.  0.  1.  0.  1.  0.  1.  1.  1.  0.  0.  0.  1.  0.  1.  0.  1.  
+  1.  1.  1.  0.  0.  0.  0.  1.  1.  1.  1.  1.  0.  1.  1.  0.  1.  0.  
+  0.  0.  1.  1.  1.  0.  0.  1.  1.  0.  1.  1.  1.  1.  0.  1.  1.  0.  
+  0.  1.  0.  1.  0.  1.  1.  1.  0.  1.  0.  1.  0.  1.  1.  1.  0.  0.  
+  0.  0.  0.  1.  1.  0.  1.  1.  0.  0.]  
+0.00895 Seconds to predict 100 labels with SVC  
 
 ### Sliding Window Search
 
 #### 1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 
-In the section: **find_cars method to detect cars in images**, the **find_cars()** function combines HOG feature extraction with a sliding window search. To improve performance, HOG features are extracted for the entire image or a selected portion of the image. These features are subsampled according to the size of the window fed to the classifier. 
+In the section: **Method for Using Classifier to Detect Cars in an Image**
 
-The function performs prediction on the HOG features for each window region and returns a list of rectangle objects corresponding to the windows that generated a positive car predictions.
+Methods were defined for:  
+- draw_boxes() - draws bounding box on image  
+- search_windows() - extracts features and runs prediction model for each window in a list of windows.
+- slide_window() - takes an image, start and stop positions (x and y), window size (x and y dimensions), and overlap fraction (75%) and identifies the position of each window to search.
+- search_all_scales() - uses slide_window() and search_window() to searche across all scaled windows (240,180,120,70) and returns predictions.       
 
-The image below shows the use of **find_cars** on a test image.  
+In the image below, sample images were taken from the test video stream. From left to right; the original image, detected boxes, all search boxes respectively.
 
-<img src="images/find_cars_test_image.png" alt="find_cars_test_image.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
+<img src="images/sample_find_car_boxes_histogram.png" alt="sample_find_car_boxes_histogram.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
 
-Window scale sizes of 1.0x, 1.5x, 2.0x, and 3.0x windows are evaluated as shown in the image below. Different window sizes are shown below in different colors. Windows of size < 1.5x appeared to generate the most false-positives.
+To reduce false positives, a BoundingBoxes was created to maintain a queue of window predictions. This class is used to implement a heatmap with a given threshold (4 was used), and can be used to average image sequences.
 
-<img src="images/different_window_sizes.png" alt="different_window_sizes.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
-
-The image below shows the final **find_cars()** function output. 
-
-<img src="images/final_window_size.png" alt="final_window_size.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
-
-To better eliminate false positives, a heatmap was generated using the function **add_heat()**. The function increments a pixel count for each overlapping window as shown in the test image below:
-
-<img src="images/unthresholed_heatmap.png" alt="unthresholed_heatmap.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
-
-By adding a minimum threshold, additional false positives can be removed. Note how lighter heat images are removed (left) from the previous heatmap (above).
-
-<img src="images/thresholed_heatmap.png" alt="thresholed_heatmap.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
+<img src="images/sample_find_car_boxes_heat.png" alt="sample_find_car_boxes_heat.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
 
 Heatmap images are labeled using **scipy.ndimage.measurement.label** as shown in the image below:
 
@@ -162,13 +178,21 @@ Finally, bounding boxes are drawn on the the labeled images as shown in the imag
 
 #### 2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
-Under the section **Integrate processing**, the **process_image()** function integrates processing for a single image frame. The image below shows processing for all test images.
+See images above.
 
-<img src="images/process_images_test_images.png" alt="process_images_test_images.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
+Performance was improved using an incremental, iterative approach. 
 
-Performance was improved using an incremental, iterative approach. It took me a long time to get there. The abblation study was helpful in efficiently determining the appropriate color space and HOG parameters. Using the **YUV** color space and **ALL** color channels signficantly improved performance. 
+- Due to the temporal (image sequence) nature of the dataset choosing images randomly for constructing training, validation, and test sets can inadverdantly leak images in the validation and test sets into the training sets. Therefore the training (70%), validation (20%), and test (10%) sets were constructued from images sequences.  
+- Added spatial binning and color histogram features. Did not really see a signficant improvement in performance with these features.  
+- Added scaling of feature vectors due to the addition of color histograms and binned features.    
+- Using an abblation study, switched from YUV to HLS colorspaces.  Higher accuracy and a better behaved detection on video images.  The original parameters of YUV, 9 orientations, 8 pixels per cell, and 2 cells per block underformed HLS, 9 orientations, 8 pixels per cell, and 2 cells for over 2% on validation data with the new dataset. Using a HOG filter with 9 or 12 orientations worked about the same. pixels_per_cell of 8 or 16 worked about the same. Other optimization techniques that proved helpful included the heatmap and heatmap threshold.  
+- Used GridSearchCV() to identify C=0.0001 for a smoother, more generalizable decision boundary.   
+- Added bounding box class to implement a queue for generating heat map. Requires 15 for video.  
+- Increased the window overlap for sliding windows search from 50% to 75% to eliminate false negatives.  
 
-Using a HOG filter > 6, i.e, 9 or 12 worked about the same. pixels_per_cell of 8 or 16 worked about the same. Other optimization techniques that proved helpful included the heatmap and heatmap threshold.
+Improvements:  
+- The single best improvement would be to include more labeled taken from image data more similar to the road conditions.
+- I wold like to try a conv net.
 
 ---
 
