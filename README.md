@@ -23,23 +23,23 @@ Credits: The code relies heavily on the lesson examples from the Udacity Self-Dr
 
 ### Summary of changes from prior version:
 
-Rewrote a significant part of my initial submission. The initial submission overfit the training data and generated some false positives. I have incorporated all of the reviewer's suggestions and more. The results are improved by there are still a few false positives.
+Rewrote a significant part of my initial submission. The initial submission overfit the training data and generated some false positives. I have incorporated all of the reviewer's suggestions and more. The results are good. False positives have essentially been eliminated. Note: It does pick up some cars in the oncoming lane.
 
 Features:  
-- HLS color space, 9 orientations, 8 pixels per cell, and 2 cells per block. Identified the parameters with a feature abblation study.  
+- YUV color space, 12 orientations, 8 pixels per cell, and 2 cells per block. Identified the parameters with a feature abblation study.  
 - 16x16 color spatial domain, 32 color histogram bins.  
 
 Classification:  
-- Linear SVM with C=0.0001. Identified with grid search. Performance in terms of accuracy on the validation and tests sets were very close with vaues of C ranging from 0.0001 to 1.0. 
+- Linear SVM with C=0.0001. Identified with grid search. Performance in terms of accuracy on the validation and test sets were very close with vaues of C ranging from 0.0001 to 1.0. 
 
-Window queue:  
-- Histogram threshold=15 of video image heatmaps. 
+Window histogram stacking of previous windows:  
+- Histogram min threshold=15 for window heatmaps. 
 
 Updates:   
-- Due to the temporal (image sequence) nature of the dataset choosing images randomly for constructing training, validation, and test sets can inadverdantly leak images in the validation and test sets into the training sets. Therefore the training (70%), validation (20%), and test (10%) sets were constructued from images sequences. Each set was then randomized.
-- Added spatial binning and color histogram features. Did not really see a signficant improvement in performance with these features.  
+- Due to the temporal (image sequence) nature of the dataset choosing images randomly for constructing training, validation, and test sets can inadverdantly leak images in the validation and test sets into the training sets. Therefore the training (70%), validation (20%), and test (10%) sets were constructued from image sequences. Each set was then randomized.
+- Added spatial binning and color histogram features. Improved accuracy on validation and test sets ~1%. Did not see a significant improvent on project video. 
 - Added scaling of feature vectors due to the addition of color histograms and spatical binning.    
-- Using an abblation study, switched from YUV to HLS colorspaces.  Higher accuracy on new dataset.  The original parameters of YUV, 9 orientations, 8 pixels per cell, and 2 cells per block underformed HLS, 9 orientations, 8 pixels per cell, and 2 cells for over 2% on validation data with the new dataset. 
+- Based on an abblation study using the new dataset, HLS colorspace had higher accuracy on new dataset.  The original parameters of YUV, 9 orientations, 8 pixels per cell, and 2 cells per block underformed HLS, 9 orientations, 8 pixels per cell, and 2 cells for over 2% on validation data with the new dataset. However the HLS colorspace had higher false positives on the test video, so I switched back to YUV.
 - Using a HOG filter with 9 or 12 orientations worked about the same. pixels_per_cell of 8 or 16 worked about the same. Other optimization techniques that proved helpful included the heatmap and heatmap threshold.
 - Used GridSearchCV() to identify C=0.0001 for a smoother, more generalizable decision boundary.   
 - Added bounding box class to implement a queue for generating heat map. Requireds 15 for video.  
@@ -121,8 +121,6 @@ An abblation study of HOG parameters and color spaces using a Linear SVM classif
 
 Under the section **Perform feature ablation study**, an abblation study of HOG parameters and color spaces using a Linear SVM classifier was used to determine optimal parameters for color spaces and hog parameters. See section 3 below.
 
-The original selection of YUV was switched to HLS.
-
 #### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
 Under the section **Create and evaluate an SVM classifier using HOG, color histogram and color spatial parameters** an SVM classifier was created.  
@@ -134,18 +132,6 @@ Feature vector length: 6156
 2.52 Seconds to train SVC...  
 Validation Accuracy of SVC =  0.9783  
 Test Accuracy of SVC =  0.9533  
-My SVC predicts:  [ 1.  0.  0.  1.  0.  1.  1.  0.  0.  0.  1.  1.  1.  1.  1.  0.  0.  0.  
-  0.  1.  0.  1.  0.  1.  0.  1.  1.  1.  0.  0.  0.  1.  0.  1.  0.  1.  
-  1.  1.  1.  0.  0.  0.  0.  1.  1.  1.  1.  1.  0.  1.  1.  0.  1.  0.  
-  0.  0.  1.  1.  1.  0.  0.  1.  1.  0.  1.  1.  1.  1.  0.  1.  1.  0.  
-  0.  1.  0.  1.  0.  1.  1.  1.  0.  1.  0.  1.  0.  1.  1.  1.  0.  0.  
-  0.  1.  0.  1.  1.  0.  1.  1.  0.  0.]  
-For these 100 labels:  [ 1.  0.  0.  1.  0.  1.  0.  0.  0.  0.  1.  1.  1.  1.  0.  0.  0.    0.
-  0.  1.  0.  1.  0.  1.  0.  1.  1.  1.  0.  0.  0.  1.  0.  1.  0.  1.  
-  1.  1.  1.  0.  0.  0.  0.  1.  1.  1.  1.  1.  0.  1.  1.  0.  1.  0.  
-  0.  0.  1.  1.  1.  0.  0.  1.  1.  0.  1.  1.  1.  1.  0.  1.  1.  0.  
-  0.  1.  0.  1.  0.  1.  1.  1.  0.  1.  0.  1.  0.  1.  1.  1.  0.  0.  
-  0.  0.  0.  1.  1.  0.  1.  1.  0.  0.]  
 0.00895 Seconds to predict 100 labels with SVC  
 
 ### Sliding Window Search
@@ -164,7 +150,7 @@ In the image below, sample images were taken from the test video stream. From le
 
 <img src="images/sample_find_car_boxes_histogram.png" alt="sample_find_car_boxes_histogram.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
 
-To reduce false positives, a BoundingBoxes was created to maintain a queue of window predictions. This class is used to implement a heatmap with a given threshold (4 was used), and can be used to average image sequences.
+To reduce false positives, a BoundingBoxes class was created to maintain a queue of window predictions. This class is used to implement a heatmap and a minimum threshold of overlapping windows, i.e., heatmaps. A threshold of 15 was used for the project video.
 
 <img src="images/sample_find_car_boxes_heat.png" alt="sample_find_car_boxes_heat.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
 
@@ -182,12 +168,13 @@ See images above.
 
 Performance was improved using an incremental, iterative approach. 
 
-- Due to the temporal (image sequence) nature of the dataset choosing images randomly for constructing training, validation, and test sets can inadverdantly leak images in the validation and test sets into the training sets. Therefore the training (70%), validation (20%), and test (10%) sets were constructued from images sequences.  
-- Added spatial binning and color histogram features. Did not really see a signficant improvement in performance with these features.  
-- Added scaling of feature vectors due to the addition of color histograms and binned features.    
-- Using an abblation study, switched from YUV to HLS colorspaces.  Higher accuracy and a better behaved detection on video images.  The original parameters of YUV, 9 orientations, 8 pixels per cell, and 2 cells per block underformed HLS, 9 orientations, 8 pixels per cell, and 2 cells for over 2% on validation data with the new dataset. Using a HOG filter with 9 or 12 orientations worked about the same. pixels_per_cell of 8 or 16 worked about the same. Other optimization techniques that proved helpful included the heatmap and heatmap threshold.  
+- Due to the temporal (image sequence) nature of the dataset choosing images randomly for constructing training, validation, and test sets can inadverdantly leak images in the validation and test sets into the training sets. Therefore the training (70%), validation (20%), and test (10%) sets were constructued from image sequences. Each set was then randomized.
+- Added spatial binning and color histogram features. Improved accuracy on validation and test sets ~1%. Did not see a significant improvent on project video. 
+- Added scaling of feature vectors due to the addition of color histograms and spatical binning.    
+- Based on an abblation study using the new dataset, HLS colorspace had higher accuracy on new dataset.  The original parameters of YUV, 9 orientations, 8 pixels per cell, and 2 cells per block underformed HLS, 9 orientations, 8 pixels per cell, and 2 cells for over 2% on validation data with the new dataset. However the HLS colorspace had higher false positives on the test video, so I switched back to YUV.
+- Using a HOG filter with 9 or 12 orientations worked about the same. pixels_per_cell of 8 or 16 worked about the same. Other optimization techniques that proved helpful included the heatmap and heatmap threshold.
 - Used GridSearchCV() to identify C=0.0001 for a smoother, more generalizable decision boundary.   
-- Added bounding box class to implement a queue for generating heat map. Requires 15 for video.  
+- Added bounding box class to implement a queue for generating heat map. Requireds 15 for video.  
 - Increased the window overlap for sliding windows search from 50% to 75% to eliminate false negatives.  
 
 Improvements:  
@@ -205,8 +192,6 @@ Here's a link to my video result: [project_video_out.mp4](project_video_out.mp4)
 #### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
 See above section "Show some examples of test images".
-
-
 
 ---
 
