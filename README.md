@@ -146,10 +146,6 @@ Methods were defined for:
 - slide_window() - takes an image, start and stop positions (x and y), window size (x and y dimensions), and overlap fraction (75%) and identifies the position of each window to search.
 - search_all_scales() - uses slide_window() and search_window() to searche across all scaled windows (240,180,120,70) and returns predictions.       
 
-In the image below, sample images were taken from the test video stream. From left to right; the original image, detected boxes, all search boxes respectively.
-
-<img src="images/sample_find_car_boxes_histogram.png" alt="sample_find_car_boxes_histogram.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
-
 To reduce false positives, a BoundingBoxes class was created to maintain a queue of window predictions. This class is used to implement a heatmap and a minimum threshold of overlapping windows, i.e., heatmaps. A threshold of 15 was used for the project video.
 
 <img src="images/sample_find_car_boxes_heat.png" alt="sample_find_car_boxes_heat.png" width="500px" style="display:block; margin-left: auto; margin-right: auto;">
